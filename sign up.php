@@ -1,9 +1,152 @@
+<?php
+/**
+ * sign-up.php - Complete self-contained registration module
+ * Built to exactly match the ecom.sql schema
+ * Handles BOTH Institution and Parent/Student registration
+ * All validations, password hashing, duplicate checks, and institution linking included
+ */
+
+session_start();
+
+// ==================== DATABASE CONNECTION ====================
+$host = 'localhost';
+$dbname = 'ecom';
+$username = 'root';           // ← Change to your MySQL user
+$password = '';               // ← Change to your MySQL password (empty for XAMPP/WAMP default)
+
+try {
+    $pdo = new PDO(
+        "mysql:host=$host;dbname=$dbname;charset=utf8mb4",
+        $username,
+        $password,
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+        ]
+    );
+} catch (PDOException $e) {
+    die('<div style="color:red;padding:20px;text-align:center;">Database connection failed. Please check your credentials.</div>');
+}
+
+// ==================== PROCESS REGISTRATION ====================
+$errors = [];
+$success = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $register_type = $_POST['register_type'] ?? '';
+
+    // ==================== INSTITUTION REGISTRATION ====================
+    if ($register_type === 'institution') {
+        $name        = trim($_POST['name'] ?? '');
+        $email       = trim($_POST['email'] ?? '');
+        $phone       = trim($_POST['phone'] ?? '');
+        $po_box      = trim($_POST['po_box'] ?? '');
+        $county      = trim($_POST['county'] ?? '');
+        $school_code = trim($_POST['school_code'] ?? '');
+        $password    = $_POST['password'] ?? '';
+        $confirm     = $_POST['confirm_password'] ?? '';
+
+        // Basic validations
+        if (empty($name)) $errors[] = "Institution name is required";
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Valid official email is required";
+        if (empty($phone)) $errors[] = "Phone number is required";
+        if (empty($password) || $password !== $confirm) $errors[] = "Passwords do not match or are empty";
+        if (strlen($password) < 6) $errors[] = "Password must be at least 6 characters";
+
+        // Check for existing email/phone
+        if (empty($errors)) {
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ? OR phone = ?");
+            $stmt->execute([$email, $phone]);
+            if ($stmt->fetch()) {
+                $errors[] = "An account with this email or phone already exists";
+            }
+        }
+
+        if (empty($errors)) {
+            try {
+                $hash = password_hash($password, PASSWORD_DEFAULT);
+
+                $stmt = $pdo->prepare("
+                    INSERT INTO users 
+                    (name, email, phone, password_hash, role, po_box, county, school_code, status)
+                    VALUES (?, ?, ?, ?, 'institution', ?, ?, ?, 'pending')
+                ");
+                $stmt->execute([$name, $email, $phone, $hash, $po_box, $county, $school_code]);
+
+                $success = "✅ Institution registered successfully!<br>Your account is pending admin approval.";
+            } catch (PDOException $e) {
+                $errors[] = "Registration failed. Please try again.";
+            }
+        }
+    }
+
+    // ==================== PARENT / STUDENT REGISTRATION ====================
+    elseif ($register_type === 'parent_student') {
+        $role             = $_POST['role'] ?? 'parent';
+        $name             = trim($_POST['name'] ?? '');
+        $email            = trim($_POST['email'] ?? '');
+        $phone            = trim($_POST['phone'] ?? '');
+        $county           = trim($_POST['county'] ?? '');
+        $institution_name = trim($_POST['institution_name'] ?? '');
+        $password         = $_POST['password'] ?? '';
+        $confirm          = $_POST['confirm_password'] ?? '';
+
+        // Basic validations
+        if (empty($name)) $errors[] = "Full name is required";
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Valid email is required";
+        if (empty($phone)) $errors[] = "Phone number is required";
+        if (empty($password) || $password !== $confirm) $errors[] = "Passwords do not match or are empty";
+        if (strlen($password) < 6) $errors[] = "Password must be at least 6 characters";
+
+        // Check for existing email/phone
+        if (empty($errors)) {
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ? OR phone = ?");
+            $stmt->execute([$email, $phone]);
+            if ($stmt->fetch()) {
+                $errors[] = "An account with this email or phone already exists";
+            }
+        }
+
+        // Try to auto-link to an existing institution (fuzzy name match)
+        $institution_id = null;
+        if (!empty($institution_name) && empty($errors)) {
+            $stmt = $pdo->prepare("
+                SELECT id FROM users 
+                WHERE role = 'institution' 
+                AND name LIKE ? 
+                LIMIT 1
+            ");
+            $stmt->execute(["%" . $institution_name . "%"]);
+            if ($row = $stmt->fetch()) {
+                $institution_id = $row['id'];
+            }
+        }
+
+        if (empty($errors)) {
+            try {
+                $hash = password_hash($password, PASSWORD_DEFAULT);
+
+                $stmt = $pdo->prepare("
+                    INSERT INTO users 
+                    (name, email, phone, password_hash, role, county, institution_id, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+                ");
+                $stmt->execute([$name, $email, $phone, $hash, $role, $county, $institution_id]);
+
+                $success = "✅ Account created successfully!<br>Your account is pending admin approval.";
+            } catch (PDOException $e) {
+                $errors[] = "Registration failed. Please try again.";
+            }
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> Register</title>
+    <title>Register - ZACK Platform</title>
     <style>
         :root {
             --blue: #2563eb;
@@ -75,7 +218,7 @@
 
         .slider-inner {
             display: flex;
-            width: 200%; /* Two main categories: Institution and Parent/Student */
+            width: 200%;
             transition: 0.5s ease-in-out;
         }
 
@@ -84,6 +227,17 @@
             padding: 30px;
             box-sizing: border-box;
         }
+
+        /* Message boxes */
+        .message {
+            padding: 14px 20px;
+            margin: 0 30px 20px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            text-align: center;
+        }
+        .success { background: #10b981; color: white; }
+        .error { background: #ef4444; color: white; }
 
         /* Inputs */
         .field { margin-bottom: 18px; position: relative; }
@@ -161,103 +315,130 @@
 </head>
 <body>
 
-<div class="card">
-    <div class="tabs">
-        <div class="tab active" onclick="slide(0)">Institution</div>
-        <div class="tab" onclick="slide(1)">Parent / Student</div>
-        <div class="indicator" id="indicator"></div>
-    </div>
+    <div class="card">
+        <!-- Success / Error Messages -->
+        <?php if ($success): ?>
+            <div class="message success"><?= $success ?></div>
+        <?php endif; ?>
 
-    <div class="slider-container">
-        <div class="slider-inner" id="sliderInner">
-            
-            <section>
-                <div class="field">
-                    <label>Institution Name</label>
-                    <input type="text" placeholder="e.g. Nairobi High School">
-                </div>
-                                <div class="field">
-                    <label>Official Email</label>
-                    <input type="email" placeholder="admin@school.ac.ke">
-                </div>
-                                <div class="field">
-                    <label>Phone Number</label>
-                    <input type="number" placeholder="0716.....">
-                </div>
-                                <div class="field">
-                    <label>P.O.Box</label>
-                    <input type="text" placeholder="100-....">
-                </div>
-                <div class="field">
-                    <label>County</label>
-                    <select class="county-list">
-                        <option value="">Select County...</option>
-                        </select>
-                </div>
-                <div class="field">
-                    <label>School Code</label>
-                    <input type="number" placeholder="(must for high schools and below)">
-                </div>
-                <div class="field pass-container">
-                    <label> Create Password</label>
-                    <input type="password" class="pass-input">
-                    <button type="button" class="toggle-btn" onclick="togglePass(this)">👁️</button>
-                </div>
-                                <div class="field pass-container">
-                    <label>Confirm Password</label>
-                    <input type="password" class="pass-input">
-                    <button type="button" class="toggle-btn" onclick="togglePass(this)">👁️</button>
-                </div>
-                <button class="btn-submit">Register Institution</button>
-            </section>
+        <?php if (!empty($errors)): ?>
+            <div class="message error">
+                <?php foreach ($errors as $error): ?>
+                    • <?= htmlspecialchars($error) ?><br>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
 
-            <section class="orange-theme">
-                <div class="field">
-                    <label>I am a:</label>
-                    <select id="userRole">
-                        <option value="parent">Parent / Guardian</option>
-                        <option value="student">Student</option>
-                    </select>
-                </div>
-                <div class="field">
-                    <label>Full Name</label>
-                    <input type="text" placeholder="Enter your official name">
-                </div>
-                <div class="field">
-                    <label>Institution Name</label>
-                    <input type="txt" placeholder="chavakali senior school">
-                </div>
-                
-                <div class="field">
-                    <label>Phone Number</label>
-                    <input type="tel" placeholder="0712 345 678">
-                </div>
-                <div class="field">
-                    <label>County of Residence</label>
-                    <select class="county-list">
-                        <option value="">Select County...</option>
-                    </select>
-                </div>
-                <div class="field pass-container">
-                    <label>Create Password</label>
-                    <input type="password" class="pass-input">
-                    <button type="button" class="toggle-btn" onclick="togglePass(this)">👁️</button>
-                </div>
-                                <div class="field pass-container">
-                    <label>Confirm Password</label>
-                    <input type="password" class="pass-input">
-                    <button type="button" class="toggle-btn" onclick="togglePass(this)">👁️</button>
-                </div>
-                <button class="btn-submit">Create Account</button>
-            </section>
+        <div class="tabs">
+            <div class="tab active" onclick="slide(0)">Institution</div>
+            <div class="tab" onclick="slide(1)">Parent / Student</div>
+            <div class="indicator" id="indicator"></div>
+        </div>
 
+        <div class="slider-container">
+            <div class="slider-inner" id="sliderInner">
+
+                <!-- ==================== INSTITUTION FORM ==================== -->
+                <section>
+                    <form method="POST" action="">
+                        <input type="hidden" name="register_type" value="institution">
+
+                        <div class="field">
+                            <label>Institution Name</label>
+                            <input type="text" name="name" placeholder="e.g. Nairobi High School" required>
+                        </div>
+                        <div class="field">
+                            <label>Official Email</label>
+                            <input type="email" name="email" placeholder="admin@school.ac.ke" required>
+                        </div>
+                        <div class="field">
+                            <label>Phone Number</label>
+                            <input type="tel" name="phone" placeholder="0716....." required>
+                        </div>
+                        <div class="field">
+                            <label>P.O.Box</label>
+                            <input type="text" name="po_box" placeholder="100-....">
+                        </div>
+                        <div class="field">
+                            <label>County</label>
+                            <select name="county" class="county-list" required>
+                                <option value="">Select County...</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>School Code</label>
+                            <input type="text" name="school_code" placeholder="(must for high schools and below)">
+                        </div>
+                        <div class="field pass-container">
+                            <label>Create Password</label>
+                            <input type="password" name="password" class="pass-input" required>
+                            <button type="button" class="toggle-btn" onclick="togglePass(this)">👁️</button>
+                        </div>
+                        <div class="field pass-container">
+                            <label>Confirm Password</label>
+                            <input type="password" name="confirm_password" class="pass-input" required>
+                            <button type="button" class="toggle-btn" onclick="togglePass(this)">👁️</button>
+                        </div>
+                        <button type="submit" class="btn-submit">Register Institution</button>
+                    </form>
+                </section>
+
+                <!-- ==================== PARENT / STUDENT FORM ==================== -->
+                <section class="orange-theme">
+                    <form method="POST" action="">
+                        <input type="hidden" name="register_type" value="parent_student">
+
+                        <div class="field">
+                            <label>I am a:</label>
+                            <select id="userRole" name="role" required>
+                                <option value="parent">Parent / Guardian</option>
+                                <option value="student">Student</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Full Name</label>
+                            <input type="text" name="name" placeholder="Enter your official name" required>
+                        </div>
+                        <div class="field">
+                            <label>Official Email</label>
+                            <input type="email" name="email" placeholder="your@email.com" required>
+                        </div>
+                        <div class="field">
+                            <label>Institution Name</label>
+                            <input type="text" name="institution_name" placeholder="chavakali senior school">
+                            <small style="color:#64748b;font-size:0.8rem;">(We will try to link you automatically)</small>
+                        </div>
+                        <div class="field">
+                            <label>Phone Number</label>
+                            <input type="tel" name="phone" placeholder="0712 345 678" required>
+                        </div>
+                        <div class="field">
+                            <label>County of Residence</label>
+                            <select name="county" class="county-list" required>
+                                <option value="">Select County...</option>
+                            </select>
+                        </div>
+                        <div class="field pass-container">
+                            <label>Create Password</label>
+                            <input type="password" name="password" class="pass-input" required>
+                            <button type="button" class="toggle-btn" onclick="togglePass(this)">👁️</button>
+                        </div>
+                        <div class="field pass-container">
+                            <label>Confirm Password</label>
+                            <input type="password" name="confirm_password" class="pass-input" required>
+                            <button type="button" class="toggle-btn" onclick="togglePass(this)">👁️</button>
+                        </div>
+                        <button type="submit" class="btn-submit">Create Account</button>
+                    </form>
+                </section>
+
+            </div>
+        </div>
+
+        <div class="footer">
+            Already have an account? <a href="login.php">Login here</a>
         </div>
     </div>
-
-    <div class="footer">
-        Already have an account? <a href="login.html">Login here</a>
-    </div>
-</div>
 
 <script>
     const counties = [
@@ -290,7 +471,6 @@
         tabs.forEach(t => t.classList.remove('active'));
         tabs[index].classList.add('active');
 
-        // Change indicator color based on section
         indicator.style.background = (index === 1) ? 'var(--orange)' : 'var(--blue)';
     }
 

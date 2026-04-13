@@ -1,9 +1,77 @@
+<?php
+/**
+ * login.php - Complete Login Module for ZACK Platform
+ * Matches ecom.sql schema perfectly
+ */
+
+session_start();
+
+// ==================== DATABASE CONNECTION ====================
+
+require __DIR__. '/./auth/db.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $identifier = trim($_POST['identifier'] ?? '');
+    $password   = $_POST['password'] ?? '';
+    $login_type = $_POST['login_type'] ?? 'institution';
+
+    if (empty($identifier) || empty($password)) {
+        $error = "Please enter both identifier and password";
+    } else {
+        // Determine which column to search based on login type
+        if ($login_type === 'institution') {
+            // Institution can login with School Code or Email
+            $sql = "SELECT * FROM users 
+                    WHERE (school_code = ? OR email = ?) 
+                    AND role IN ('institution', 'admin') 
+                    LIMIT 1";
+        } else {
+            // Parent/Student can login with Phone or Email
+            $sql = "SELECT * FROM users 
+                    WHERE (phone = ? OR email = ?) 
+                    AND role IN ('parent', 'student') 
+                    LIMIT 1";
+        }
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$identifier, $identifier]);
+        $user = $stmt->fetch();
+
+        if ($user && password_verify($password, $user['password_hash'])) {
+            
+            // Check account status
+            if ($user['status'] !== 'active') {
+                $error = "Your account is " . htmlspecialchars($user['status']) . ". Please contact admin.";
+            } else {
+                // Successful login - Set session variables
+                $_SESSION['user_id']   = $user['id'];
+                $_SESSION['user_name'] = $user['name'];
+                $_SESSION['role']      = $user['role'];
+                $_SESSION['institution_id'] = $user['institution_id'] ?? $user['id'];
+
+                // Redirect based on role
+                if ($user['role'] === 'admin' || $user['role'] === 'institution') {
+                    header("Location: dashboard/institution.php");
+                    exit;
+                }
+                 else {
+                    header("Location: parent/student.php");
+                    exit;
+                }
+            }
+        } else {
+            $error = "Invalid credentials. Please check your details and try again.";
+        }
+    }
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
+    <title>Login - ZACK Platform</title>
     <style>
         :root {
             --blue: #2563eb;
@@ -55,7 +123,6 @@
             display: flex;
             position: relative;
             border-bottom: 1px solid var(--border);
-            margin-top: 20px;
         }
 
         .tab {
@@ -82,7 +149,6 @@
             transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* Slider */
         .slider-container {
             width: 100%;
             overflow: hidden;
@@ -165,6 +231,16 @@
 
         .orange-theme .btn-login { background: var(--orange); }
 
+        .error-msg {
+            color: #ef4444;
+            font-size: 0.85rem;
+            margin: 10px 30px;
+            text-align: center;
+            padding: 10px;
+            background: #fee2e2;
+            border-radius: 8px;
+        }
+
         .footer {
             text-align: center;
             padding: 20px;
@@ -195,43 +271,66 @@
         <div class="indicator" id="indicator"></div>
     </div>
 
-    <div class="slider-container">
-        <div class="slider-inner" id="sliderInner">
-            
-            <section>
-                <div class="field">
-                    <label>School Code / Email</label>
-                    <input type="text" placeholder="Enter school identifier">
-                </div>
-                <div class="field">
-                    <label>Password</label>
-                    <input type="password" class="pass-input" placeholder="••••••••">
-                    <button type="button" class="toggle-btn" onclick="togglePass(this)">👁️</button>
-                </div>
-                <a href="#" class="forgot-pass">Forgot password?</a>
-                <button class="btn-login">Login to Dashboard</button>
-            </section>
+    <?php if (!empty($error)): ?>
+        <div class="error-msg"><?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
 
-            <section class="orange-theme">
-                <div class="field">
-                    <label>Phone Number / Admin No</label>
-                    <input type="text" placeholder="e.g. 0712345678 or 4501">
-                </div>
-                <div class="field">
-                    <label>Password</label>
-                    <input type="password" class="pass-input" placeholder="••••••••">
-                    <button type="button" class="toggle-btn" onclick="togglePass(this)">👁️</button>
-                </div>
-                <a href="#" class="forgot-pass" style="color: var(--orange);">Forgot password?</a>
-                <button class="btn-login">Access Account</button>
-            </section>
+    <form method="POST" id="loginForm">
+        <input type="hidden" name="login_type" id="login_type" value="institution">
 
+        <div class="slider-container">
+            <div class="slider-inner" id="sliderInner">
+                
+                <!-- Institution Login -->
+                <section>
+                    <div class="field">
+                        <label>School Code or Official Email</label>
+                        <input type="text" name="identifier" 
+                               placeholder="e.g. 45678 or admin@school.ac.ke" required>
+                    </div>
+                    <div class="field">
+                        <label>Password</label>
+                        <input type="password" name="password" class="pass-input" 
+                               placeholder="Enter your password" required>
+                        <button type="button" class="toggle-btn" onclick="togglePass(this)">👁️</button>
+                    </div>
+                    <a href="#" class="forgot-pass">Forgot password?</a>
+                    <button type="submit" class="btn-login">Login to Dashboard</button>
+                </section>
+    
+          
+    
+            </div>
         </div>
-    </div>
+    </form>
 
     <div class="footer">
-        Don't have an account? <a href="sign up.html">Sign up</a>
+        Don't have an account? <a href="sign-up.php">Sign up here</a>
+        Admin? <a href="admin-login.php">Admin</a>
     </div>
+</div>
+
+
+<div class="login-card">
+    <form method="POST" id="loginForm">
+    <input type="hidden" name="login_type" id="login_type" value="institution">
+              <!-- Parent / Student Login -->
+                <section class="orange-theme">
+                    <div class="field">
+                        <label>Phone Number or Email</label>
+                        <input type="text" name="identifier" 
+                               placeholder="e.g. 0712345678 or your@email.com" required>
+                    </div>
+                    <div class="field">
+                        <label>Password</label>
+                        <input type="password" name="password" class="pass-input" 
+                               placeholder="Enter your password" required>
+                        <button type="button" class="toggle-btn" onclick="togglePass(this)">👁️</button>
+                    </div>
+                    <a href="#" class="forgot-pass" style="color: var(--orange);">Forgot password?</a>
+                    <button type="submit" class="btn-login">Access Account</button>
+                </section>
+    </form>
 </div>
 
 <script>
@@ -239,6 +338,7 @@
         const inner = document.getElementById('sliderInner');
         const indicator = document.getElementById('indicator');
         const tabs = document.querySelectorAll('.tab');
+        const loginType = document.getElementById('login_type');
 
         inner.style.transform = `translateX(-${index * 50}%)`;
         indicator.style.left = `${index * 50}%`;
@@ -247,6 +347,9 @@
         tabs[index].classList.add('active');
 
         indicator.style.background = (index === 1) ? 'var(--orange)' : 'var(--blue)';
+        
+        // Update hidden field for backend
+        loginType.value = (index === 0) ? 'institution' : 'parent_student';
     }
 
     function togglePass(btn) {
@@ -259,6 +362,15 @@
             btn.textContent = "👁️";
         }
     }
+
+    // Submit form on Enter key
+    document.querySelectorAll('input').forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('loginForm').submit();
+            }
+        });
+    });
 </script>
 
 </body>
