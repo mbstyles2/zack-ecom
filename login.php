@@ -307,15 +307,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="footer">
         Don't have an account? <a href="sign-up.php">Sign up here</a>
         Admin? <a href="admin-login.php">Admin</a>
+        <a href="student-login.php">Student/Parent Login</a>
     </div>
 </div>
 
 
-<div class="login-card">
+<!-- <div class="login-card">
     <form method="POST" id="loginForm">
-    <input type="hidden" name="login_type" id="login_type" value="institution">
+    <input type="hidden" name="login_type" id="login_type" value="institution"> -->
               <!-- Parent / Student Login -->
-                <section class="orange-theme">
+                <!-- <section class="orange-theme">
                     <div class="field">
                         <label>Phone Number or Email</label>
                         <input type="text" name="identifier" 
@@ -331,7 +332,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <button type="submit" class="btn-login">Access Account</button>
                 </section>
     </form>
-</div>
+</div> -->
 
 <script>
     function slide(index) {

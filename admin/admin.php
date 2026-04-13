@@ -253,45 +253,67 @@ $stats = $pdo->query("
     <!-- ==================== PRODUCTS VIEW ==================== -->
     <div id="prodView" class="view-panel">
         <h2>Products Management</h2>
-        <p><a href="kits.php">products</a></p>
-        <!-- You can expand this later with full product form and table -->
+        <p><a href="kits.php">Create Kits</a></p>
+        <p><a href="product.php">Create Products</a></p>
+        <?php
+        $kits = $pdo->query("SELECT * FROM kits ORDER BY created_at DESC")->fetchAll();
+        ?>
+        
+        <table>
+        <thead>
+            <tr>
+                <th>Kit Name</th>
+                <th>Level</th>
+                <th>Class/Grade</th>
+                <th>Total Price</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (empty($kits)): ?>
+            <tr>
+                <td colspan="6" style="text-align:center;padding:40px;color:#64748b;">
+                    No kits created yet. Use the form above to add your first kit.
+                </td>
+            </tr>
+            <?php else: ?>
+                <?php foreach ($kits as $kit): ?>
+                <tr>
+                    <td><?= htmlspecialchars($kit['name']) ?></td>
+                    <td><?= htmlspecialchars($kit['level']) ?></td>
+                    <td><?= htmlspecialchars($kit['class_grade']) ?></td>
+                    <td><strong>KES <?= number_format($kit['total_base_price'], 2) ?></strong></td>
+                    <td><?= date('d M Y', strtotime($kit['created_at'])) ?></td>
+                    <td>
+                        <a href="kits.php?edit=<?= $kit['id'] ?>" class="action-btn" style="background:#2563eb;color:white;">Edit</a>
+                        <a href="kits.php?delete=<?= $kit['id'] ?>" 
+                           class="action-btn" 
+                           style="background:#ef4444;color:white;"
+                           onclick="return confirm('Delete this kit permanently? This cannot be undone.')">
+                            Delete
+                        </a>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </tbody>
+    </table>
     </div>
 
     <!-- ==================== ORDERS VIEW ==================== -->
     <div id="orderView" class="view-panel">
         <h2>All Orders</h2>
         <a href="orders.php">o</a>
+        <a href="quotations.php">quo</a>
     </div>
 
     <!-- ==================== USERS VIEW ==================== -->
     <div id="userView" class="view-panel">
         <h2>Parents & Students</h2>
-        <!-- <a href="users.php">us</a> -->
-        <table>
-            <thead>
-                <tr><th>Name</th><th>Role</th><th>Phone</th><th>Linked School</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-                <?php
-                $users = $pdo->query("
-                    SELECT u.*, i.name as school_name 
-                    FROM users u 
-                    LEFT JOIN users i ON u.institution_id = i.id 
-                    WHERE u.role IN ('parent','student')
-                ")->fetchAll();
-                foreach ($users as $u):
-                ?>
-                <tr>
-                    <td><?= htmlspecialchars($u['name']) ?></td>
-                    <td><?= ucfirst($u['role']) ?></td>
-                    <td><?= htmlspecialchars($u['phone']) ?></td>
-                    <td><?= htmlspecialchars($u['school_name'] ?? 'Not linked') ?></td>
-                    <td><?= ucfirst($u['status']) ?></td>
-                    
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+        <a href="users.php">user</a>
+        
+
     </div>
 </div>
 

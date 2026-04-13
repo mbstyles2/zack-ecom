@@ -180,9 +180,7 @@ foreach ($cart_items as $item) {
         </div>
 
         <div style="padding: 0 30px 30px; text-align:right;">
-            <button onclick="alert('Proceeding to checkout... (Feature coming soon)')" class="btn btn-primary">
-                Proceed to Checkout
-            </button>
+           <a href="checkout.php">Checkout</a>
             <a href="student.php" class="btn btn-secondary">Continue Shopping</a>
         </div>
     <?php endif; ?>

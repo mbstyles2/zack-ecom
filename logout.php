@@ -46,7 +46,7 @@ session_destroy();
     <script>
         // Auto redirect to login after 2 seconds
         setTimeout(() => {
-            window.location.href = '/login.php';
+            window.location.href = './login.php';
         }, 30000);
     </script>
 </body>

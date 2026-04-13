@@ -1,50 +1,63 @@
 <?php
 /**
- * admin-login.php - Dedicated Login Page for Admin Only
+ * student-login.php - Dedicated Login for Students & Parents
  */
 
 session_start();
 
-// If already logged in as admin, redirect to dashboard
-if (isset($_SESSION['user_id']) && $_SESSION['role'] === 'admin') {
-    header("Location: dashboard/admin.php");
+// If already logged in as student or parent, redirect to dashboard
+if (isset($_SESSION['user_id']) && in_array($_SESSION['role'], ['parent', 'student'])) {
+    header("Location: parent/student.php");
     exit;
 }
 
-require __DIR__. '/./auth/db.php';
+$host = 'localhost';
+$dbname = 'ecom';
+$username = 'root';
+$password = '';
+
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+    ]);
+} catch (PDOException $e) {
+    die("Database connection failed.");
+}
 
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email    = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
+    $identifier = trim($_POST['identifier'] ?? '');
+    $password   = $_POST['password'] ?? '';
 
-    if (empty($email) || empty($password)) {
-        $error = "Please enter email and password";
+    if (empty($identifier) || empty($password)) {
+        $error = "Please enter your phone number or email and password";
     } else {
+        // Allow login with phone or email for parents/students
         $stmt = $pdo->prepare("
             SELECT * FROM users 
-            WHERE email = ? AND role = 'admin' 
+            WHERE (phone = ? OR email = ?) 
+            AND role IN ('parent', 'student')
             LIMIT 1
         ");
-        $stmt->execute([$email]);
-        $admin = $stmt->fetch();
+        $stmt->execute([$identifier, $identifier]);
+        $user = $stmt->fetch();
 
-        if ($admin && password_verify($password, $admin['password_hash'])) {
+        if ($user && password_verify($password, $user['password_hash'])) {
             
-            if ($admin['status'] !== 'active') {
-                $error = "Your account is " . $admin['status'] . ". Please contact support.";
+            if ($user['status'] !== 'active') {
+                $error = "Your account is " . htmlspecialchars($user['status']) . ". Please contact your school admin.";
             } else {
-                // Successful admin login
-                $_SESSION['user_id']   = $admin['id'];
-                $_SESSION['user_name'] = $admin['name'];
-                $_SESSION['role']      = 'admin';
+                // Successful login
+                $_SESSION['user_id']   = $user['id'];
+                $_SESSION['user_name'] = $user['name'];
+                $_SESSION['role']      = $user['role'];
 
-                header("Location: admin/admin.php");
+                header("Location: parent/student.php");
                 exit;
             }
         } else {
-            $error = "Invalid email or password";
+            $error = "Invalid phone/email or password";
         }
     }
 }
@@ -55,28 +68,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - ZACK Platform</title>
+    <title>Student / Parent Login - ZACK</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
         
         body {
             font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, #1a237e, #0d1440);
+            background: linear-gradient(135deg, #f68b1e, #ff8c42);
             margin: 0;
             padding: 0;
             height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
         }
 
         .login-box {
             background: white;
             color: #333;
-            padding: 40px 35px;
+            padding: 45px 40px;
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.25);
             width: 100%;
             max-width: 420px;
         }
@@ -88,7 +100,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: linear-gradient(135deg, #f68b1e, #ff5722);
             background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
+        }
+
+        .tagline {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 15px;
         }
 
         h2 {
@@ -98,19 +117,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 22px;
         }
 
         label {
             display: block;
             margin-bottom: 8px;
             font-weight: 500;
+            color: #444;
         }
 
         input {
             width: 100%;
-            padding: 14px;
-            border: 1px solid #ddd;
+            padding: 14px 16px;
+            border: 1.5px solid #ddd;
             border-radius: 10px;
             font-size: 16px;
             box-sizing: border-box;
@@ -119,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         input:focus {
             outline: none;
             border-color: #f68b1e;
-            box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.1);
+            box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.15);
         }
 
         .btn-login {
@@ -151,13 +171,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 14px;
             color: #666;
         }
+
+        .footer a {
+            color: #f68b1e;
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
 
 <div class="login-box">
     <div class="logo">ZACK</div>
-    <h2>Admin Login</h2>
+    <div class="tagline">For Students & Parents</div>
+    <h2>Welcome Back</h2>
 
     <?php if (!empty($error)): ?>
         <div class="error"><?= htmlspecialchars($error) ?></div>
@@ -165,21 +191,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <form method="POST">
         <div class="form-group">
-            <label>Admin Email</label>
-            <input type="email" name="email" placeholder="admin@zack.com" required value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
+            <label>Phone Number or Email</label>
+            <input type="text" name="identifier" placeholder="0712345678 or your@email.com" required>
         </div>
 
         <div class="form-group">
             <label>Password</label>
-            <input type="password" name="password" placeholder="Enter password" required>
+            <input type="password" name="password" placeholder="Enter your password" required>
         </div>
 
-        <button type="submit" class="btn-login">Login as Admin</button>
+        <button type="submit" class="btn-login">Login</button>
     </form>
 
     <div class="footer">
-        Default Password: <strong>password</strong><br>
-        <small>Change it immediately after first login for security.</small>
+        Don't have an account? <a href="sign-up.php">Sign up here</a><br><br>
+        <small>Default password for testing: <strong>password</strong></small>
     </div>
 </div>
 

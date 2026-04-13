@@ -349,7 +349,7 @@ function toggleItem(btn, productId, productName) {
 
 function submitQuotation() {
     if (selectedItems.length === 0) {
-        alert("Please select at least one item.");
+        alert("Please select at least one item for quotation.");
         return;
     }
 
@@ -357,20 +357,24 @@ function submitQuotation() {
 
     fetch('submit_quotation.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `products=\( {JSON.stringify(selectedItems)}&notes= \){encodeURIComponent(notes || '')}`
+        headers: { 
+            'Content-Type': 'application/x-www-form-urlencoded' 
+        },
+        body: `products=${encodeURIComponent(JSON.stringify(selectedItems))}&notes=${encodeURIComponent(notes || '')}`
     })
-    .then(r => r.json())
+    .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert("✅ Quotation request submitted successfully!\nAdmin will review and respond shortly.");
+            alert("✅ Quotation request submitted successfully!\n\nOrder ID: #" + data.order_id + "\nAdmin will review and respond shortly.");
             selectedItems = [];
-            showSection('orders');   // Show orders after submission
+            showSection('orders');   // Refresh to show orders
         } else {
-            alert(data.message || "Failed to submit quotation.");
+            alert(data.message || "Failed to submit quotation request.");
         }
     })
-    .catch(() => alert("Connection error. Please try again."));
+    .catch(() => {
+        alert("Connection error. Please check your internet and try again.");
+    });
 }
 
 function logout() {
