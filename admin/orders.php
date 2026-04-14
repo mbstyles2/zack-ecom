@@ -42,7 +42,7 @@ if (isset($_POST['update_status'])) {
                 FROM orders o 
                 JOIN users u ON o.user_id = u.id 
                 JOIN users i ON o.institution_id = i.id 
-                ORDER BY o.created_at DESC
+                ORDER BY id ASC  
             ")->fetchAll();
             foreach ($orders as $o):
             ?>

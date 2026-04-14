@@ -204,8 +204,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
 
     <div class="footer">
-        Don't have an account? <a href="sign-up.php">Sign up here</a><br><br>
-        <small>Default password for testing: <strong>password</strong></small>
+        Don't have an account? <a href="sign-up.php">sign-up here</a><br><br>
+       
     </div>
 </div>
 

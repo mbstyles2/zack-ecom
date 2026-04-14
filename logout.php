@@ -40,7 +40,7 @@ session_destroy();
     <div class="message">
         <h2>You have been logged out successfully</h2>
         <p>Thank you for using ZACK Platform</p>
-        <a href="../login.php">→ Back to Login</a>
+        <a href="./login.php">→ Back to Login</a>
     </div>
 
     <script>

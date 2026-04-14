@@ -142,7 +142,9 @@ $stats = $pdo->query("
             border-bottom: 1px solid #eee;
         }
         th { background: #f8f9fa; font-weight: 600; color: #555; }
-
+        a{
+            text-decoration: none;
+        }
         .btn {
             padding: 8px 16px;
             border: none;
@@ -206,7 +208,7 @@ $stats = $pdo->query("
     <!-- ==================== INSTITUTIONS VIEW ==================== -->
     <div id="instView" class="view-panel">
         <h2>Institutions Management</h2>
-        <!-- <a href="institutions.php">inst</a> -->
+        <a href="institutions.php" style="float:right; margin-bottom:15px; color:#0d6efd; text-decoration:none;">Create Institution →</a>
   
     <table>
         <thead>
@@ -217,7 +219,7 @@ $stats = $pdo->query("
         </thead>
         <tbody>
             <?php
-            $stmt = $pdo->query("SELECT * FROM users WHERE role = 'institution' ORDER BY created_at DESC");
+            $stmt = $pdo->query("SELECT * FROM users WHERE role = 'institution' ORDER BY created_at ASC");
             while ($row = $stmt->fetch()):
             ?>
             <tr>
@@ -253,10 +255,11 @@ $stats = $pdo->query("
     <!-- ==================== PRODUCTS VIEW ==================== -->
     <div id="prodView" class="view-panel">
         <h2>Products Management</h2>
-        <p><a href="kits.php">Create Kits</a></p>
-        <p><a href="product.php">Create Products</a></p>
+        <p><a href="kits.php" style="float:right; margin-bottom:15px; color:#0d6efd; text-decoration:none;">Create Kits →</a></p>
+        <br>
+        <p><a href="product.php" style="float:right; margin-bottom:15px; color:#0d6efd; text-decoration:none;">Create Products →</a></p>
         <?php
-        $kits = $pdo->query("SELECT * FROM kits ORDER BY created_at DESC")->fetchAll();
+        $kits = $pdo->query("SELECT * FROM kits ORDER BY id ASC ")->fetchAll();
         ?>
         
         <table>
@@ -302,19 +305,114 @@ $stats = $pdo->query("
     </div>
 
     <!-- ==================== ORDERS VIEW ==================== -->
-    <div id="orderView" class="view-panel">
+    <div id="orderView" class="view-panel" >
         <h2>All Orders</h2>
-        <a href="orders.php">o</a>
-        <a href="quotations.php">quo</a>
+        <a href="orders.php" style="float:right; margin-bottom:15px; color:#0d6efd; text-decoration:none;">orders →</a> <br>
+        <br>
+        <a href="quotations.php" style="float:right; margin-bottom:15px; color:#0d6efd; text-decoration:none;">quotations →</a>
+
+        <table>
+        <thead>
+            <tr><th>Order ID</th><th>Customer</th><th>School</th><th>Type</th><th>Amount</th><th>Status</th><th>Date</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+            <?php
+            $orders = $pdo->query("
+                SELECT o.*, u.name as customer, i.name as school 
+                FROM orders o 
+                JOIN users u ON o.user_id = u.id 
+                JOIN users i ON o.institution_id = i.id 
+                ORDER BY id ASC  
+            ")->fetchAll();
+            foreach ($orders as $o):
+            ?>
+            <tr>
+                <td>#<?= $o['id'] ?></td>
+                <td><?= htmlspecialchars($o['customer']) ?></td>
+                <td><?= htmlspecialchars($o['school']) ?></td>
+                <td><?= $o['order_type'] ?></td>
+                <td>KES <?= number_format($o['total_amount'], 2) ?></td>
+                <td><?= ucfirst($o['status']) ?></td>
+                <td><?= date('d M Y', strtotime($o['created_at'])) ?></td>
+                <!-- <td>
+                    <form method="post" style="display:inline;">
+                        <input type="hidden" name="order_id" value="<?= $o['id'] ?>">
+                        <select name="new_status">
+                            <option value="pending" <?= $o['status']=='pending'?'selected':'' ?>>Pending</option>
+                            <option value="quoted">Quoted</option>
+                            <option value="approved">Approved</option>
+                            <option value="paid">Paid</option>
+                            <option value="processing">Processing</option>
+                            <option value="shipped">Shipped</option>
+                            <option value="delivered">Delivered</option>
+                        </select>
+                        <button type="submit" name="update_status" class="btn">Update</button>
+                    </form>
+                </td> -->
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
     </div>
 
     <!-- ==================== USERS VIEW ==================== -->
     <div id="userView" class="view-panel">
-        <h2>Parents & Students</h2>
-        <a href="users.php">user</a>
-        
+    <h2>Parents & Students</h2>
+    <a href="users.php" style="float:right; margin-bottom:15px; color:#0d6efd; text-decoration:none;">
+        View All Users →
+    </a>
+    
+    <!-- Mini Table: Name and Role Only -->
+    <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+        <thead>
+            <tr style="background:#f8f9fa;">
+                <th style="padding:12px; text-align:left; border-bottom:1px solid #ddd;">Name</th>
+                <th style="padding:12px; text-align:left; border-bottom:1px solid #ddd;">Role</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php
+            // Fetch only the latest 5 parents and students for the mini table
+            $miniUsers = $pdo->prepare("
+                SELECT name, role 
+                FROM users 
+                WHERE role IN ('parent', 'student')
+                ORDER BY created_at DESC 
+                LIMIT 5
+            ");
+            $miniUsers->execute();
+            $recentUsers = $miniUsers->fetchAll();
 
-    </div>
+            if (empty($recentUsers)):
+            ?>
+                <tr>
+                    <td colspan="2" style="padding:30px; text-align:center; color:#6c757d;">
+                        No users yet.
+                    </td>
+                </tr>
+            <?php else: ?>
+                <?php foreach ($recentUsers as $u): ?>
+                <tr>
+                    <td style="padding:12px; border-bottom:1px solid #eee;">
+                        <?= htmlspecialchars($u['name']) ?>
+                    </td>
+                    <td style="padding:12px; border-bottom:1px solid #eee;">
+                        <span style="background:#e3f2fd; color:#1976d2; padding:4px 10px; border-radius:12px; font-size:13px;">
+                            <?= ucfirst($u['role']) ?>
+                        </span>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </tbody>
+    </table>
+
+    <?php if (count($recentUsers) >= 5): ?>
+        <p style="text-align:right; margin-top:10px;">
+            <a href="users.php" style="color:#0d6efd; font-size:14px;">View all users →</a>
+        </p>
+    <?php endif; ?>
+</div>
 </div>
 
 <script>

@@ -305,7 +305,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
 
     <div class="footer">
-        Don't have an account? <a href="sign-up.php">Sign up here</a>
+        Don't have an account? <a href="sign-up.php">sign-up here</a>
         Admin? <a href="admin-login.php">Admin</a>
         <a href="student-login.php">Student/Parent Login</a>
     </div>
